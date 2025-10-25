@@ -96,24 +96,55 @@ def api_chat():
     try:
         data = request.get_json() or {}
         message = (data.get("message") or "").strip()
-        if not message:
-            return jsonify({"response":"Please type a question."})
-        if contains_blocked(message):
-            return jsonify({"response":"Sorry, message contains prohibited content."}), 400
-        user_profile = {
-            "id": current_user.id if current_user.is_authenticated else None,
-            "primary_crop": current_user.primary_crop if current_user.is_authenticated else None,
-            "region": current_user.region if current_user.is_authenticated else None,
-            "preferred_language": current_user.preferred_language if current_user.is_authenticated else None
-        }
-        reply = process_message(user_profile, message)
-        reply = sanitize_output(reply)
-        ch = ChatHistory(user_id=user_profile["id"], user_message=message, bot_response=reply)
+        image_data = data.get("image")  # optional base64 or filename from frontend
+
+        if not message and not image_data:
+            return jsonify({"response":"Please type a question or upload an image."})
+
+        # If image is provided, process it first
+        if image_data:
+            # save and analyze image (simplified)
+            from PIL import Image
+            import base64, io
+            header, encoded = image_data.split(",",1) if "," in image_data else ("","")
+            file_bytes = io.BytesIO(base64.b64decode(encoded))
+            im = Image.open(file_bytes).convert('RGB').resize((200,200))
+            pixels = list(im.getdata())
+            greens = sum(1 for r,g,b in pixels if g>r+10 and g>b+10)
+            total=len(pixels)
+            healthy_ratio = greens/total
+            if healthy_ratio < 0.05:
+                reply = "Severe discoloration / possible disease. Inspect plants."
+            elif healthy_ratio < 0.4:
+                reply = "Partial damage / early symptoms. Check for pests."
+            else:
+                reply = "Likely healthy leaf."
+        else:
+            # text-based chat
+            if contains_blocked(message):
+                return jsonify({"response":"Sorry, message contains prohibited content."}), 400
+            user_profile = {
+                "id": current_user.id if current_user.is_authenticated else None,
+                "primary_crop": current_user.primary_crop if current_user.is_authenticated else None,
+                "region": current_user.region if current_user.is_authenticated else None,
+                "preferred_language": current_user.preferred_language if current_user.is_authenticated else None
+            }
+            reply = process_message(user_profile, message)
+            reply = sanitize_output(reply)
+
+        # Save chat history
+        ch = ChatHistory(
+            user_id=current_user.id if current_user.is_authenticated else None,
+            user_message=message or "Image uploaded",
+            bot_response=reply
+        )
         db.session.add(ch); db.session.commit()
         return jsonify({"response": reply})
+
     except Exception as e:
         print("Error /api/chat:", e)
         return jsonify({"response":"Internal server error"}), 500
+
 
 # Admin
 @app.route("/admin")

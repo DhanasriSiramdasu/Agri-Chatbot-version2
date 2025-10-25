@@ -26,11 +26,24 @@ def load_kb():
             keys = entry.get('keywords') or []
             if isinstance(keys,str): keys=[k.strip() for k in keys.split(',') if k.strip()]
             for k in keys:
-                out[k.lower()] = {'en': entry.get('answer_en',''), 'hi': entry.get('answer_hi',''), 'ta': entry.get('answer_ta','')}
+                out[k.lower()] = {
+                    'en': entry.get('answer_en',''),
+                    'hi': entry.get('answer_hi',''),
+                    'ta': entry.get('answer_ta',''),
+                    'es': entry.get('answer_es',''),  # new
+                    'fr': entry.get('answer_fr','')   # new
+                }
     elif isinstance(data,dict):
         for k,v in data.items():
             if isinstance(v,str): out[k.lower()] = {'en': v}
-            elif isinstance(v,dict): out[k.lower()] = {'en': v.get('answer_en',''), 'hi': v.get('answer_hi',''), 'ta': v.get('answer_ta','')}
+            elif isinstance(v,dict): 
+                out[k.lower()] = {
+                    'en': v.get('answer_en',''),
+                    'hi': v.get('answer_hi',''),
+                    'ta': v.get('answer_ta',''),
+                    'es': v.get('answer_es',''),
+                    'fr': v.get('answer_fr','')
+                }
     return out
 KB = load_kb()
 def detect_language(text: str) -> str:
